@@ -1,0 +1,650 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>BNY Custodian Reconciliation — Resilience Dashboard</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --navy-950:#0A1622;
+    --navy-900:#0D1D2C;
+    --navy-850:#122841;
+    --navy-800:#16324F;
+    --navy-700:#1F4363;
+    --navy-line:#2A4C6B;
+    --parchment:#EEE6D3;
+    --parchment-dim:#D9CFB6;
+    --brass:#C0964F;
+    --brass-dim:#8B723F;
+    --rust:#B8562E;
+    --rust-soft:#D98860;
+    --sage:#5F9271;
+    --sage-soft:#8FBF9E;
+    --steel:#7FA3BC;
+    --ink:#EEE9DC;
+    --ink-dim:#A9B7C3;
+    --ink-faint:#6E8394;
+    --radius-sm:4px;
+    --radius-md:8px;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:
+      radial-gradient(ellipse at top left, rgba(192,150,79,0.06), transparent 45%),
+      radial-gradient(ellipse at bottom right, rgba(95,146,113,0.05), transparent 50%),
+      var(--navy-950);
+    color:var(--ink);
+    font-family:'Inter', sans-serif;
+    -webkit-font-smoothing:antialiased;
+  }
+  .page{max-width:1180px;margin:0 auto;padding:0 28px 80px;}
+  .num{font-family:'IBM Plex Mono', monospace;}
+
+  /* ---------- Masthead ---------- */
+  .masthead{
+    padding:44px 0 30px;
+    border-bottom:1px solid var(--navy-line);
+    display:flex; justify-content:space-between; align-items:flex-end; gap:24px; flex-wrap:wrap;
+  }
+  .masthead .eyebrow{
+    font-family:'IBM Plex Mono', monospace; font-size:11px; letter-spacing:0.16em; text-transform:uppercase;
+    color:var(--brass); margin:0 0 10px;
+  }
+  .masthead h1{
+    font-family:'Fraunces', serif; font-weight:600; font-size:34px; line-height:1.15; margin:0;
+    color:var(--ink); max-width:640px;
+  }
+  .masthead .meta{
+    text-align:right; font-family:'IBM Plex Mono', monospace; font-size:12px; color:var(--ink-faint); line-height:1.8;
+  }
+  .masthead .meta strong{color:var(--ink-dim); font-weight:500;}
+
+  /* ---------- Hero ---------- */
+  .hero{
+    display:grid; grid-template-columns:280px 1fr; gap:40px;
+    padding:44px 0; border-bottom:1px solid var(--navy-line);
+    align-items:center;
+  }
+  .gauge-wrap{position:relative; width:260px; height:260px; margin:0 auto;}
+  .gauge-label{
+    position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center;
+  }
+  .gauge-label .score{font-family:'Fraunces', serif; font-weight:600; font-size:56px; color:var(--ink); line-height:1;}
+  .gauge-label .score span{font-size:20px; color:var(--ink-faint); font-family:'IBM Plex Mono', monospace;}
+  .gauge-label .tag{font-size:11px; letter-spacing:0.1em; text-transform:uppercase; color:var(--brass); margin-top:8px; font-family:'IBM Plex Mono', monospace;}
+
+  .hero-stats{display:grid; grid-template-columns:repeat(3,1fr); gap:1px; background:var(--navy-line); border:1px solid var(--navy-line); border-radius:var(--radius-md); overflow:hidden;}
+  .stat-cell{background:var(--navy-900); padding:20px 22px;}
+  .stat-cell .stat-label{font-size:11px; text-transform:uppercase; letter-spacing:0.08em; color:var(--ink-faint); margin-bottom:10px;}
+  .stat-cell .stat-value{font-family:'IBM Plex Mono', monospace; font-size:26px; color:var(--ink); font-weight:600;}
+  .stat-cell .stat-value.rust{color:var(--rust-soft);}
+  .stat-cell .stat-value.sage{color:var(--sage-soft);}
+  .stat-cell .stat-sub{font-size:12px; color:var(--ink-faint); margin-top:6px;}
+  .hero-note{grid-column:1/-1; font-size:13px; color:var(--ink-dim); line-height:1.6; padding-top:4px;}
+
+  /* ---------- Panels ---------- */
+  .panel{padding:48px 0; border-bottom:1px solid var(--navy-line);}
+  .panel:last-of-type{border-bottom:none;}
+  .panel-head{display:flex; justify-content:space-between; align-items:baseline; margin-bottom:26px; flex-wrap:wrap; gap:10px;}
+  .panel-head h2{font-family:'Fraunces', serif; font-weight:600; font-size:22px; margin:0; color:var(--ink);}
+  .panel-head .panel-sub{font-size:12.5px; color:var(--ink-faint); max-width:420px; text-align:right;}
+
+  /* ---------- Ledger strip (signature element) ---------- */
+  .ledger{
+    background:var(--parchment);
+    border-radius:var(--radius-md);
+    padding:26px 26px 30px;
+    box-shadow: inset 0 0 0 1px rgba(0,0,0,0.06), 0 12px 30px rgba(0,0,0,0.35);
+  }
+  .ledger-top{display:flex; justify-content:space-between; align-items:center; margin-bottom:18px; font-family:'IBM Plex Mono', monospace; font-size:11.5px; color:#5A5138; letter-spacing:0.04em;}
+  .ledger-bar{position:relative; height:34px; border-radius:3px; overflow:hidden; display:flex; background:#DED2AE; box-shadow:inset 0 0 0 1px rgba(0,0,0,0.08);}
+  .ledger-bar .seg{height:100%; display:flex; align-items:center; justify-content:center;}
+  .ledger-bar .seg.stp{background:var(--sage);}
+  .ledger-legend{display:flex; align-items:center; gap:6px; font-family:'IBM Plex Mono', monospace; font-size:11px; color:#5A5138;}
+  .stamps{display:grid; grid-template-columns:repeat(5,1fr); gap:16px; margin-top:26px;}
+  .stamp{
+    position:relative; background:#F7F1E1; border:1px solid rgba(0,0,0,0.08); border-radius:var(--radius-sm);
+    padding:16px 14px 14px; text-align:center;
+  }
+  .stamp .seal{
+    width:46px; height:46px; margin:0 auto 10px; border-radius:50%;
+    border:2px solid var(--brass-dim); display:flex; align-items:center; justify-content:center;
+    font-family:'IBM Plex Mono', monospace; font-weight:600; font-size:15px; color:var(--brass-dim);
+    transform:rotate(-6deg);
+  }
+  .stamp:nth-child(2) .seal{transform:rotate(4deg);}
+  .stamp:nth-child(3) .seal{transform:rotate(-3deg);}
+  .stamp:nth-child(4) .seal{transform:rotate(5deg);}
+  .stamp:nth-child(5) .seal{transform:rotate(-5deg);}
+  .stamp .cause{font-size:12px; font-weight:600; color:#3A3223; line-height:1.3; margin-bottom:4px;}
+  .stamp .share{font-family:'IBM Plex Mono', monospace; font-size:11px; color:#7A6E4E;}
+
+  /* ---------- VUCA radar (4 axes: Volatility / Uncertainty / Complexity / Ambiguity) ---------- */
+  .radar-wrap{display:grid; grid-template-columns:1fr 280px; gap:32px; align-items:start;}
+  .radar-box{position:relative; width:100%; aspect-ratio:1/1; background:var(--navy-900); border:1px solid var(--navy-line); border-radius:var(--radius-md);}
+  .radar-key{display:flex; flex-direction:column; gap:12px;}
+  .radar-key .rk-item{display:flex; gap:10px; align-items:flex-start; font-size:12.5px; color:var(--ink-dim); line-height:1.5; cursor:pointer; padding:8px; border-radius:var(--radius-sm); border:1px solid transparent;}
+  .radar-key .rk-item:hover{border-color:var(--navy-line);}
+  .radar-key .rk-item.off{opacity:0.35;}
+  .radar-key .swatch{width:12px; height:12px; border-radius:3px; margin-top:3px; flex:none;}
+  .radar-key strong{color:var(--ink); display:block; font-size:12.5px; margin-bottom:2px;}
+  .radar-key input{margin-top:3px; accent-color:var(--brass);}
+
+  /* ---------- AI classifier demo ---------- */
+  .classifier{margin-top:22px; background:var(--navy-900); border:1px solid var(--navy-line); border-radius:var(--radius-md); padding:22px;}
+  .classifier-head{display:flex; justify-content:space-between; align-items:center; margin-bottom:14px; flex-wrap:wrap; gap:8px;}
+  .c-eyebrow{font-family:'IBM Plex Mono', monospace; font-size:11px; letter-spacing:0.1em; text-transform:uppercase; color:var(--brass);}
+  .c-model{font-family:'IBM Plex Mono', monospace; font-size:11px; color:var(--ink-faint);}
+  .classifier textarea{
+    width:100%; min-height:64px; resize:vertical; background:var(--navy-950); border:1px solid var(--navy-line);
+    border-radius:var(--radius-sm); color:var(--ink); font-family:'Inter', sans-serif; font-size:13px; padding:12px;
+    line-height:1.5;
+  }
+  .classifier textarea:focus{outline:1px solid var(--brass);}
+  .classifier-actions{display:flex; justify-content:space-between; align-items:center; margin-top:12px; flex-wrap:wrap; gap:10px;}
+  #classifyBtn{
+    background:var(--brass); color:var(--navy-950); border:none; font-family:'Inter', sans-serif; font-weight:600;
+    font-size:13px; padding:10px 18px; border-radius:20px; cursor:pointer;
+  }
+  #classifyBtn:hover{background:var(--brass-dim); color:var(--ink);}
+  .c-examples{display:flex; align-items:center; gap:8px; font-size:11.5px; color:var(--ink-faint);}
+  .ex-btn{
+    background:transparent; color:var(--steel); border:1px solid var(--navy-line); font-size:11.5px;
+    padding:6px 10px; border-radius:14px; cursor:pointer; font-family:'Inter', sans-serif;
+  }
+  .ex-btn:hover{border-color:var(--steel); color:var(--ink);}
+  .classifier-result{margin-top:18px; border-top:1px solid var(--navy-line); padding-top:16px;}
+  .cr-empty{font-size:12.5px; color:var(--ink-faint); font-style:italic;}
+  .cr-top{display:flex; justify-content:space-between; align-items:baseline; margin-bottom:12px;}
+  .cr-top .cr-label{font-size:11px; text-transform:uppercase; letter-spacing:0.08em; color:var(--ink-faint);}
+  .cr-top .cr-pick{font-family:'Fraunces', serif; font-size:20px; font-weight:600; color:var(--ink);}
+  .cr-top .cr-conf{font-family:'IBM Plex Mono', monospace; font-size:13px; color:var(--brass);}
+  .cr-row{display:grid; grid-template-columns:150px 1fr 44px; align-items:center; gap:10px; margin-bottom:8px; font-size:12px; color:var(--ink-dim);}
+  .cr-track{height:6px; background:var(--navy-700); border-radius:3px; overflow:hidden;}
+  .cr-fill{height:100%; background:var(--brass); border-radius:3px; transition:width .3s ease;}
+  .cr-val{font-family:'IBM Plex Mono', monospace; text-align:right; color:var(--ink-faint);}
+  .cr-why{font-size:12px; color:var(--ink-faint); margin-top:12px; line-height:1.6;}
+  .cr-why b{color:var(--ink-dim);}
+
+  /* ---------- Scenario simulator ---------- */
+  .sim-wrap{display:grid; grid-template-columns:1fr 300px; gap:36px;}
+  .sliders{display:flex; flex-direction:column; gap:22px;}
+  .slider-row .s-top{display:flex; justify-content:space-between; font-size:13px; margin-bottom:8px;}
+  .slider-row .s-top .s-name{color:var(--ink);}
+  .slider-row .s-top .s-val{font-family:'IBM Plex Mono', monospace; color:var(--brass);}
+  .slider-row .s-desc{font-size:12px; color:var(--ink-faint); margin-top:6px; line-height:1.5;}
+  input[type=range]{
+    -webkit-appearance:none; appearance:none; width:100%; height:4px; border-radius:2px;
+    background:var(--navy-700); outline:none;
+  }
+  input[type=range]::-webkit-slider-thumb{
+    -webkit-appearance:none; width:16px; height:16px; border-radius:50%;
+    background:var(--brass); border:2px solid var(--navy-950); cursor:pointer; margin-top:-6px;
+  }
+  input[type=range]::-moz-range-thumb{
+    width:16px; height:16px; border-radius:50%; background:var(--brass); border:2px solid var(--navy-950); cursor:pointer;
+  }
+  .sim-output{background:var(--navy-900); border:1px solid var(--navy-line); border-radius:var(--radius-md); padding:24px;}
+  .sim-output .o-label{font-size:11px; text-transform:uppercase; letter-spacing:0.08em; color:var(--ink-faint); margin-bottom:6px;}
+  .sim-output .o-value{font-family:'IBM Plex Mono', monospace; font-size:32px; font-weight:600; margin-bottom:2px;}
+  .sim-output .o-value.rust{color:var(--rust-soft);}
+  .sim-output .o-value.sage{color:var(--sage-soft);}
+  .sim-output .o-delta{font-size:12px; color:var(--ink-faint); margin-bottom:22px;}
+  .sim-output .o-bar-track{height:8px; background:var(--navy-700); border-radius:4px; overflow:hidden; margin-bottom:22px;}
+  .sim-output .o-bar-fill{height:100%; border-radius:4px; transition:width .2s ease, background .2s ease;}
+  .sim-output .o-note{font-size:12px; color:var(--ink-dim); line-height:1.6; border-top:1px solid var(--navy-line); padding-top:16px;}
+
+  /* ---------- Watchlist ---------- */
+  table{width:100%; border-collapse:collapse; font-size:13px;}
+  thead th{
+    text-align:left; font-family:'IBM Plex Mono', monospace; font-size:10.5px; text-transform:uppercase; letter-spacing:0.06em;
+    color:var(--ink-faint); font-weight:500; padding:0 14px 10px; border-bottom:1px solid var(--navy-line);
+  }
+  tbody td{padding:14px; border-bottom:1px solid var(--navy-800); color:var(--ink-dim); vertical-align:middle;}
+  tbody tr:last-child td{border-bottom:none;}
+  tbody td.mono{font-family:'IBM Plex Mono', monospace; color:var(--ink);}
+  .risk-pill{
+    display:inline-flex; align-items:center; gap:6px; font-family:'IBM Plex Mono', monospace; font-size:11.5px;
+    padding:4px 10px; border-radius:20px; font-weight:600;
+  }
+  .risk-high{background:rgba(184,86,46,0.16); color:var(--rust-soft);}
+  .risk-med{background:rgba(192,150,79,0.16); color:var(--brass);}
+  .risk-low{background:rgba(95,146,113,0.16); color:var(--sage-soft);}
+  .risk-pill .dot{width:6px; height:6px; border-radius:50%; background:currentColor;}
+
+  footer{padding-top:36px; font-size:12px; color:var(--ink-faint); line-height:1.7;}
+  footer strong{color:var(--ink-dim);}
+
+  @media (max-width:820px){
+    .hero{grid-template-columns:1fr;}
+    .hero-stats{grid-template-columns:1fr 1fr;}
+    .stamps{grid-template-columns:repeat(2,1fr);}
+    .quad-wrap{grid-template-columns:1fr;}
+    .sim-wrap{grid-template-columns:1fr;}
+    .masthead{flex-direction:column; align-items:flex-start;}
+    .masthead .meta{text-align:left;}
+  }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <header class="masthead">
+    <div>
+      <p class="eyebrow">Strategic Resilience — Working Prototype</p>
+      <h1>Custodian Reconciliation Resilience Dashboard</h1>
+    </div>
+    <div class="meta">
+      <div><strong>Client context:</strong> BNY custodian settlement instructions</div>
+      <div><strong>Framework:</strong> VUCA + Scenario Planning</div>
+      <div><strong>Data:</strong> Illustrative / directional, not production figures</div>
+    </div>
+  </header>
+
+  <section class="hero">
+    <div class="gauge-wrap">
+      <svg width="260" height="260" viewBox="0 0 260 260">
+        <circle cx="130" cy="130" r="108" fill="none" stroke="#1F4363" stroke-width="14"/>
+        <circle id="gaugeArc" cx="130" cy="130" r="108" fill="none" stroke="#C0964F" stroke-width="14"
+          stroke-linecap="round" transform="rotate(-90 130 130)"
+          stroke-dasharray="678.6" stroke-dashoffset="149.3"/>
+      </svg>
+      <div class="gauge-label">
+        <div class="score" id="scoreValue">78<span>/100</span></div>
+        <div class="tag">Resilience Score</div>
+      </div>
+    </div>
+    <div class="hero-stats">
+      <div class="stat-cell">
+        <div class="stat-label">Straight-through rate</div>
+        <div class="stat-value sage">97.1%</div>
+        <div class="stat-sub">1,203,640 of 1,240,000 instructions / mo</div>
+      </div>
+      <div class="stat-cell">
+        <div class="stat-label">Break rate</div>
+        <div class="stat-value rust" id="heroBreakRate">2.9%</div>
+        <div class="stat-sub">35,960 instructions requiring manual touch</div>
+      </div>
+      <div class="stat-cell">
+        <div class="stat-label">Highest-exposure cause</div>
+        <div class="stat-value" style="font-size:18px;">SSI Mismatch</div>
+        <div class="stat-sub">34% of all breaks · high complexity</div>
+      </div>
+      <div class="hero-note">
+        The 3% that breaks isn't uniform risk — it's five distinct failure modes with different volatility and complexity profiles. Treating it as one number hides where reconciliation is actually fragile. This dashboard classifies the breaks, maps them on VUCA, and lets you stress-test how the break rate moves under future conditions.
+      </div>
+    </div>
+  </section>
+
+  <!-- BREAK CLASSIFICATION -->
+  <section class="panel">
+    <div class="panel-head">
+      <h2>AI-Assisted Classification Engine</h2>
+      <div class="panel-sub">An NLP classifier reads the free-text exception note attached to each break and scores it against root-cause categories. The stamps below are its output aggregated over a month; the console underneath runs the same scoring live on a note you provide.</div>
+    </div>
+    <div class="ledger">
+      <div class="ledger-top">
+        <span>MONTHLY INSTRUCTION LEDGER — 1,240,000 ENTRIES</span>
+        <span>REF. AI-CLS-0826</span>
+      </div>
+      <div class="ledger-bar">
+        <div class="seg stp" style="width:97.1%;"></div>
+        <div class="seg" style="width:2.9%; background:var(--rust);"></div>
+      </div>
+      <div style="display:flex; justify-content:space-between; margin-top:8px;">
+        <div class="ledger-legend"><span style="width:10px;height:10px;border-radius:2px;background:var(--sage);display:inline-block;"></span> Matched straight-through — 97.1%</div>
+        <div class="ledger-legend"><span style="width:10px;height:10px;border-radius:2px;background:var(--rust);display:inline-block;"></span> Break requiring intervention — 2.9%</div>
+      </div>
+
+      <div class="stamps">
+        <div class="stamp"><div class="seal">34%</div><div class="cause">SSI Mismatch</div><div class="share">12,226 instr / mo</div></div>
+        <div class="stamp"><div class="seal">26%</div><div class="cause">Timing / Cutoff</div><div class="share">9,350 instr / mo</div></div>
+        <div class="stamp"><div class="seal">18%</div><div class="cause">Data Format</div><div class="share">6,473 instr / mo</div></div>
+        <div class="stamp"><div class="seal">14%</div><div class="cause">Corp. Action Conflict</div><div class="share">5,034 instr / mo</div></div>
+        <div class="stamp"><div class="seal">8%</div><div class="cause">Regulatory Hold</div><div class="share">2,877 instr / mo</div></div>
+      </div>
+    </div>
+
+    <div class="classifier">
+      <div class="classifier-head">
+        <span class="c-eyebrow">Live classifier console</span>
+        <span class="c-model">keyword-weighted NLP scorer · prototype v0.3</span>
+      </div>
+      <textarea id="classifierInput" placeholder="Paste or type an exception note — e.g. &quot;Beneficiary custodian account on the instruction does not match the SSI on file for trade ref 88214&quot;"></textarea>
+      <div class="classifier-actions">
+        <button id="classifyBtn" type="button">Classify note</button>
+        <div class="c-examples">
+          <span>Try:</span>
+          <button class="ex-btn" data-ex="0" type="button">SSI note</button>
+          <button class="ex-btn" data-ex="1" type="button">Cutoff note</button>
+          <button class="ex-btn" data-ex="2" type="button">Corp. action note</button>
+          <button class="ex-btn" data-ex="3" type="button">Vague note</button>
+        </div>
+      </div>
+      <div class="classifier-result" id="classifierResult">
+        <div class="cr-empty">Result will appear here once you classify a note.</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- VUCA MAP -->
+  <section class="panel">
+    <div class="panel-head">
+      <h2>VUCA Exposure Map</h2>
+      <div class="panel-sub">Each break cause scored 0–100 across all four VUCA dimensions — Volatility, Uncertainty, Complexity, Ambiguity — so the shape of its risk is visible, not just its size. Click a cause to isolate it.</div>
+    </div>
+    <div class="radar-wrap">
+      <div class="radar-box" id="radarBox">
+        <svg id="radarSvg" viewBox="0 0 340 340" width="100%" height="100%"></svg>
+      </div>
+      <div class="radar-key" id="radarKey"></div>
+    </div>
+  </section>
+
+  <!-- SCENARIO SIMULATOR -->
+  <section class="panel">
+    <div class="panel-head">
+      <h2>Scenario Simulator</h2>
+      <div class="panel-sub">Move the drivers to model how forward-looking conditions push the break rate and resilience score.</div>
+    </div>
+    <div class="sim-wrap">
+      <div class="sliders">
+        <div class="slider-row">
+          <div class="s-top"><span class="s-name">Trade volume surge</span><span class="s-val" id="v0">20%</span></div>
+          <input type="range" min="0" max="100" value="20" id="s0">
+          <div class="s-desc">Earnings season, index rebalancing, or macro events driving instruction volume up sharply.</div>
+        </div>
+        <div class="slider-row">
+          <div class="s-top"><span class="s-name">Settlement cycle compression</span><span class="s-val" id="v1">20%</span></div>
+          <input type="range" min="0" max="100" value="20" id="s1">
+          <div class="s-desc">Movement toward T+1/T+0 leaves less buffer time to resolve timing and cutoff mismatches.</div>
+        </div>
+        <div class="slider-row">
+          <div class="s-top"><span class="s-name">SSI / data vendor disruption</span><span class="s-val" id="v2">20%</span></div>
+          <input type="range" min="0" max="100" value="20" id="s2">
+          <div class="s-desc">An upstream reference-data or SSI provider outage or quality lapse.</div>
+        </div>
+        <div class="slider-row">
+          <div class="s-top"><span class="s-name">Cross-border regulatory shock</span><span class="s-val" id="v3">20%</span></div>
+          <input type="range" min="0" max="100" value="20" id="s3">
+          <div class="s-desc">New sanctions, reporting, or holding-period rules triggering unplanned regulatory holds.</div>
+        </div>
+      </div>
+      <div class="sim-output">
+        <div class="o-label">Projected break rate</div>
+        <div class="o-value rust" id="outBreakRate">2.9%</div>
+        <div class="o-delta" id="outBreakDelta">baseline conditions</div>
+        <div class="o-bar-track"><div class="o-bar-fill" id="outBreakBar" style="width:27%; background:var(--rust);"></div></div>
+
+        <div class="o-label">Resilience score</div>
+        <div class="o-value sage" id="outResilience">78</div>
+        <div class="o-delta" id="outResilienceDelta">stable</div>
+        <div class="o-bar-track"><div class="o-bar-fill" id="outResilienceBar" style="width:78%; background:var(--sage);"></div></div>
+
+        <div class="o-note" id="outNote">All drivers near baseline. No single scenario is currently dominant — reconciliation posture is stable.</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- WATCHLIST -->
+  <section class="panel">
+    <div class="panel-head">
+      <h2>Predictive Early-Warning Watchlist</h2>
+      <div class="panel-sub">Instructions flagged by the model as likely to break before settlement, ranked by risk score.</div>
+    </div>
+    <table>
+      <thead>
+        <tr><th>Instruction ID</th><th>Client Bank</th><th>Predicted Cause</th><th>Risk Score</th><th>Recommended Action</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td class="mono">INS-88214</td><td>Bank A (EU custody link)</td><td>SSI Mismatch</td>
+          <td><span class="risk-pill risk-high"><span class="dot"></span>91</span></td>
+          <td>Route to SSI verification queue pre-cutoff</td>
+        </tr>
+        <tr>
+          <td class="mono">INS-88301</td><td>Bank C (APAC desk)</td><td>Timing / Cutoff</td>
+          <td><span class="risk-pill risk-high"><span class="dot"></span>84</span></td>
+          <td>Escalate for early cutoff processing</td>
+        </tr>
+        <tr>
+          <td class="mono">INS-88347</td><td>Bank D (corp. actions)</td><td>Corp. Action Conflict</td>
+          <td><span class="risk-pill risk-med"><span class="dot"></span>63</span></td>
+          <td>Cross-check against corporate action calendar</td>
+        </tr>
+        <tr>
+          <td class="mono">INS-88390</td><td>Bank B (LatAm desk)</td><td>Regulatory Hold</td>
+          <td><span class="risk-pill risk-med"><span class="dot"></span>57</span></td>
+          <td>Pre-clear against current sanctions list</td>
+        </tr>
+        <tr>
+          <td class="mono">INS-88412</td><td>Bank A (EU custody link)</td><td>Data Format</td>
+          <td><span class="risk-pill risk-low"><span class="dot"></span>29</span></td>
+          <td>Auto-correct field, monitor only</td>
+        </tr>
+      </tbody>
+    </table>
+  </section>
+
+  <footer>
+    <strong>Prototype note:</strong> figures shown are illustrative and structured to match the discussed 97%/3% split — they are placeholders for BNY's actual exception-log data, which would feed the classification engine and calibrate the scenario weights before this goes further than a mentor review.
+  </footer>
+
+</div>
+
+<script>
+  // ---- VUCA radar chart (4 axes: Volatility, Uncertainty, Complexity, Ambiguity) ----
+  const vucaData = [
+    {key:'ssi',   label:'SSI Mismatch',          share:34, color:'#D98860', v:{V:45,U:60,C:78,A:55},
+      note:'High on complexity and ambiguity — root cause is rarely obvious from the note alone. Needs a structural fix, not just monitoring.'},
+    {key:'cutoff',label:'Timing / Cutoff',        share:26, color:'#C0964F', v:{V:82,U:35,C:25,A:20},
+      note:'Low complexity and ambiguity but highly volatile — spikes hard around market events. Best target for early-warning flags.'},
+    {key:'fmt',   label:'Data Format',            share:18, color:'#8FBF9E', v:{V:22,U:25,C:48,A:30},
+      note:'Low across the board — steady background noise, low urgency, good candidate for straightforward automation.'},
+    {key:'corp',  label:'Corp. Action Conflict',  share:14, color:'#7FA3BC', v:{V:75,U:70,C:85,A:80},
+      note:'High on all four dimensions — smallest share but the single most fragile cause per instruction.'},
+    {key:'reg',   label:'Regulatory Hold',        share:8,  color:'#D9CFB6', v:{V:50,U:85,C:55,A:65},
+      note:'Uncertainty and ambiguity dominate — driven by policy shifts rather than market activity, hard to predict from history alone.'},
+  ];
+  const AXES = [
+    {id:'V', label:'Volatility', angle:-90},
+    {id:'U', label:'Uncertainty', angle:0},
+    {id:'C', label:'Complexity', angle:90},
+    {id:'A', label:'Ambiguity', angle:180},
+  ];
+  const active = new Set(vucaData.map(d=>d.key));
+  const svg = document.getElementById('radarSvg');
+  const CX=170, CY=170, MAXR=112;
+
+  function pt(r, angleDeg){
+    const rad = angleDeg*Math.PI/180;
+    return [CX + r*Math.cos(rad), CY + r*Math.sin(rad)];
+  }
+  function polyPoints(values){
+    return AXES.map(ax=>{
+      const r = (values[ax.id]/100)*MAXR;
+      const [x,y] = pt(r, ax.angle);
+      return x.toFixed(1)+','+y.toFixed(1);
+    }).join(' ');
+  }
+
+  function renderRadar(){
+    let s = '';
+    // grid rings
+    [0.25,0.5,0.75,1].forEach(f=>{
+      const ring = AXES.map(ax=>{ const [x,y]=pt(MAXR*f, ax.angle); return x.toFixed(1)+','+y.toFixed(1); }).join(' ');
+      s += `<polygon points="${ring}" fill="none" stroke="#1F4363" stroke-width="1"/>`;
+    });
+    // spokes + labels
+    AXES.forEach(ax=>{
+      const [x,y] = pt(MAXR, ax.angle);
+      s += `<line x1="${CX}" y1="${CY}" x2="${x.toFixed(1)}" y2="${y.toFixed(1)}" stroke="#1F4363" stroke-width="1"/>`;
+      const [lx,ly] = pt(MAXR+22, ax.angle);
+      s += `<text x="${lx.toFixed(1)}" y="${ly.toFixed(1)}" text-anchor="middle" dominant-baseline="middle" fill="#A9B7C3" font-family="IBM Plex Mono, monospace" font-size="10" letter-spacing="0.5">${ax.label}</text>`;
+    });
+    // data polygons
+    vucaData.forEach(d=>{
+      if(!active.has(d.key)) return;
+      s += `<polygon points="${polyPoints(d.v)}" fill="${d.color}" fill-opacity="0.16" stroke="${d.color}" stroke-width="2"/>`;
+      AXES.forEach(ax=>{
+        const r = (d.v[ax.id]/100)*MAXR;
+        const [x,y] = pt(r, ax.angle);
+        s += `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="3.2" fill="${d.color}"/>`;
+      });
+    });
+    svg.innerHTML = s;
+  }
+
+  function renderRadarKey(){
+    const key = document.getElementById('radarKey');
+    key.innerHTML = '';
+    vucaData.forEach(d=>{
+      const item = document.createElement('div');
+      item.className = 'rk-item' + (active.has(d.key) ? '' : ' off');
+      item.innerHTML = `<input type="checkbox" ${active.has(d.key)?'checked':''}>
+        <div><span class="swatch" style="background:${d.color};display:inline-block;"></span> <strong>${d.label} — ${d.share}% of breaks</strong>${d.note}</div>`;
+      item.querySelector('input').addEventListener('change', e=>{
+        if(e.target.checked) active.add(d.key); else active.delete(d.key);
+        item.classList.toggle('off', !e.target.checked);
+        renderRadar();
+      });
+      key.appendChild(item);
+    });
+  }
+  renderRadar();
+  renderRadarKey();
+
+  // ---- AI classifier demo ----
+  const CATEGORIES = {
+    'SSI Mismatch': ['ssi','standard settlement instruction','settlement instruction','account number','beneficiary account','custodian account','bank details','account does not match','account mismatch'],
+    'Timing / Cutoff': ['cutoff','deadline','late submission','after hours','sod','eod','value date','received late','past cutoff','time zone'],
+    'Data Format': ['format','field','isin','missing field','invalid field','parse error','swift message','tag','truncated','encoding'],
+    'Corp. Action Conflict': ['corporate action','dividend','stock split','merger','tender offer','entitlement','record date','ex-date','election'],
+    'Regulatory Hold': ['sanction','compliance hold','regulatory','kyc','aml','watchlist','restricted party','embargo','reporting requirement'],
+  };
+  const EXAMPLES = [
+    "Beneficiary custodian account on the instruction does not match the SSI on file for trade ref 88214.",
+    "Instruction received after the 4pm cutoff for same-day value date settlement, held for next cycle.",
+    "Trade conflicts with pending corporate action entitlement; record date falls inside settlement window.",
+    "Instruction failed downstream processing, reason unclear from source system, escalated for manual review."
+  ];
+
+  function classify(text){
+    const lower = text.toLowerCase();
+    const scores = {};
+    let totalHits = 0;
+    Object.entries(CATEGORIES).forEach(([cat, kws])=>{
+      let hits = 0;
+      kws.forEach(k=>{ if(lower.includes(k)) hits++; });
+      scores[cat] = hits;
+      totalHits += hits;
+    });
+    return {scores, totalHits};
+  }
+
+  function renderClassification(text){
+    const resultEl = document.getElementById('classifierResult');
+    if(!text || !text.trim()){
+      resultEl.innerHTML = '<div class="cr-empty">Enter a note above, then classify it.</div>';
+      return;
+    }
+    const {scores, totalHits} = classify(text);
+    if(totalHits === 0){
+      resultEl.innerHTML = `
+        <div class="cr-top"><span class="cr-pick" style="font-size:16px;">No strong signal — routed to manual review</span></div>
+        <div class="cr-why">The note doesn't contain enough matching language for any category. In production this would fall below the confidence threshold and queue for a human to tag, which also becomes new training signal for the model.</div>`;
+      return;
+    }
+    const entries = Object.entries(scores).sort((a,b)=>b[1]-a[1]);
+    const top = entries[0];
+    const confidence = Math.round((top[1]/totalHits)*100);
+    let rows = '';
+    entries.forEach(([cat,hits])=>{
+      const pct = Math.round((hits/totalHits)*100);
+      rows += `<div class="cr-row">
+        <span>${cat}</span>
+        <div class="cr-track"><div class="cr-fill" style="width:${pct}%; background:${cat===top[0] ? 'var(--brass)' : 'var(--navy-700)'};"></div></div>
+        <span class="cr-val">${pct}%</span>
+      </div>`;
+    });
+    resultEl.innerHTML = `
+      <div class="cr-top">
+        <div><div class="cr-label">Predicted cause</div><div class="cr-pick">${top[0]}</div></div>
+        <div class="cr-conf">${confidence}% confidence</div>
+      </div>
+      ${rows}
+      <div class="cr-why">Score reflects how many category-specific terms in the note matched the model's keyword patterns — a simplified stand-in for the trained NLP embedding model this would run on in production.</div>`;
+  }
+
+  document.getElementById('classifyBtn').addEventListener('click', ()=>{
+    renderClassification(document.getElementById('classifierInput').value);
+  });
+  document.querySelectorAll('.ex-btn').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      const text = EXAMPLES[parseInt(btn.dataset.ex,10)];
+      document.getElementById('classifierInput').value = text;
+      renderClassification(text);
+    });
+  });
+
+  // ---- Scenario simulator ----
+  const sliders = [
+    {id:'s0', vid:'v0', weight:2.2},
+    {id:'s1', vid:'v1', weight:3.1},
+    {id:'s2', vid:'v2', weight:2.6},
+    {id:'s3', vid:'v3', weight:1.7},
+  ];
+  const baseRate = 1.0;
+  const gaugeArc = document.getElementById('gaugeArc');
+  const CIRC = 2*Math.PI*108;
+
+  function compute(){
+    let contribution = 0;
+    sliders.forEach(s=>{
+      const val = parseInt(document.getElementById(s.id).value,10);
+      document.getElementById(s.vid).textContent = val+'%';
+      contribution += (val/100)*s.weight;
+    });
+    const breakRate = baseRate + contribution;
+    const resilience = Math.max(0, Math.min(100, Math.round(100 - breakRate*7.5)));
+
+    // break rate output
+    document.getElementById('outBreakRate').textContent = breakRate.toFixed(1)+'%';
+    document.getElementById('heroBreakRate').textContent = breakRate.toFixed(1)+'%';
+    const deltaFromBase = breakRate - 2.9;
+    const dEl = document.getElementById('outBreakDelta');
+    if(Math.abs(deltaFromBase) < 0.05){ dEl.textContent = 'baseline conditions'; }
+    else { dEl.textContent = (deltaFromBase>0?'+':'')+deltaFromBase.toFixed(1)+' pts vs. current baseline'; }
+    document.getElementById('outBreakBar').style.width = Math.min(100,(breakRate/11)*100)+'%';
+
+    // resilience output
+    document.getElementById('outResilience').textContent = resilience;
+    document.getElementById('scoreValue').innerHTML = resilience+'<span>/100</span>';
+    document.getElementById('outResilienceBar').style.width = resilience+'%';
+    const rEl = document.getElementById('outResilienceDelta');
+    const rBar = document.getElementById('outResilienceBar');
+    const rVal = document.getElementById('outResilience');
+    const bBar = document.getElementById('outBreakBar');
+    let rColor, note;
+    if(resilience >= 65){ rColor='var(--sage-soft)'; rEl.textContent='stable'; note='All drivers near baseline. No single scenario is currently dominant — reconciliation posture is stable.'; }
+    else if(resilience >= 40){ rColor='var(--brass)'; rEl.textContent='under pressure'; note='Combined exposure is pushing past comfortable margins — worth prioritizing the highest-weighted driver above for mitigation.'; }
+    else { rColor='var(--rust-soft)'; rEl.textContent='critical'; note='Compounded stress across drivers would meaningfully strain reconciliation capacity — this is the scenario worth stress-testing operational playbooks against.'; }
+    rVal.style.color = rColor; rBar.style.background = rColor;
+
+    // gauge arc
+    const offset = CIRC * (1 - resilience/100);
+    gaugeArc.setAttribute('stroke-dasharray', CIRC.toFixed(1));
+    gaugeArc.setAttribute('stroke-dashoffset', offset.toFixed(1));
+    gaugeArc.setAttribute('stroke', resilience>=65 ? '#5F9271' : (resilience>=40 ? '#C0964F' : '#B8562E'));
+
+    document.getElementById('outNote').textContent = note;
+  }
+  sliders.forEach(s=> document.getElementById(s.id).addEventListener('input', compute));
+  compute();
+</script>
+</body>
+</html>
